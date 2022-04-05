@@ -1,5 +1,5 @@
 ﻿using System.IO;
-using tetryds.RealtimeMessaging.Buffer;
+using tetryds.RealtimeMessaging.MemoryManagement;
 
 namespace tetryds.RealtimeMessaging
 {

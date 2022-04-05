@@ -3,15 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace tetryds.RealtimeMessaging.Buffer
+namespace tetryds.RealtimeMessaging.MemoryManagement
 {
-    public class ReadBuffer
+    public class ReadBuffer : IDisposable
     {
-        MemoryStream memoryStream;
+        readonly MemoryStream memoryStream;
+        readonly MemoryPool memoryPool;
 
-        public ReadBuffer(MemoryStream memoryStream)
+        public long Length => memoryStream.Length;
+
+        public ReadBuffer(MemoryStream memoryStream, MemoryPool memoryPool)
         {
             this.memoryStream = memoryStream;
+            this.memoryPool = memoryPool;
         }
 
         public int Read(byte[] buffer)
@@ -23,5 +27,12 @@ namespace tetryds.RealtimeMessaging.Buffer
         {
             return memoryStream.Read(buffer, index, count);
         }
+
+        public void Dispose()
+        {
+            memoryPool.Push(memoryStream);
+        }
+
+        ~ReadBuffer() => Dispose();
     }
 }

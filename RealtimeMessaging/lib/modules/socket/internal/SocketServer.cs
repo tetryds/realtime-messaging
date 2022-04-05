@@ -3,26 +3,33 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using tetryds.RealtimeMessaging.MemoryManagement;
 
 namespace tetryds.RealtimeMessaging.Network.Internal
 {
-    public class SocketServer
+    public class SocketServer : IDisposable
     {
         const int MAX_MSG_SIZE = 65536;
-        int port;
+
+        readonly int port;
+        readonly MemoryPool memoryPool;
+
+        Task clientAcceptor;
+
         TcpListener listener;
 
-        bool running = false;
+        volatile bool running = false;
 
-        Dictionary<Guid, TcpClient> clientMap;
+        public event Action<SocketClient> ClientConnected;
+        public event Action<Exception> ErrorOcurred;
 
-
-        public SocketServer(int port)
+        public SocketServer(int port, MemoryPool memoryPool)
         {
             this.port = port;
+            this.memoryPool = memoryPool;
         }
 
-        public void StartListener()
+        public void Start()
         {
             if (running)
                 throw new InvalidOperationException("Socket server already running!");
@@ -31,6 +38,9 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             IPAddress address = IPAddress.Any;
             listener = new TcpListener(address, port);
             listener.Start();
+
+            clientAcceptor = new Task(DoAcceptClient, TaskCreationOptions.LongRunning);
+            clientAcceptor.Start();
         }
 
         private void DoAcceptClient()
@@ -40,68 +50,23 @@ namespace tetryds.RealtimeMessaging.Network.Internal
                 try
                 {
                     Socket client = listener.AcceptSocket();
-                    Guid guid = Guid.NewGuid();
-                    ServerListener serverListener = new ServerListener(guid, client);
+                    SocketClient socketClient = new SocketClient(client, memoryPool);
+                    socketClient.Start();
+                    ClientConnected?.Invoke(socketClient);
                 }
-                catch
+                catch (Exception e)
                 {
-                    // TODO: log
+                    ErrorOcurred?.Invoke(e);
                 }
             }
         }
 
-        private class ServerListener
+        public void Dispose()
         {
-            Guid guid;
-            Socket socket;
-
-            bool running = false;
-
-            byte[] lenBuffer = new byte[4];
-            byte[] readBuffer = new byte[0];
-
-            Action<Exception> ErrorOcurred;
-
-            public ServerListener(Guid guid, Socket socket)
-            {
-                this.guid = guid;
-                this.socket = socket;
-            }
-
-            public void StartListener()
-            {
-                Task.Run(DoListen, )
-            }
-
-            private void DoListen()
-            {
-                while (running)
-                {
-                    try
-                    {
-                        int count = socket.Receive(lenBuffer, 4, SocketFlags.None);
-                        if (count != 4)
-                            throw new Exception("Wrong package length data!");
-                        int len = BitConverter.ToInt32(lenBuffer, 0);
-                        int readLen = socket.Receive()
-                    }
-                    catch(Exception e)
-                    {
-                        ErrorOcurred?.Invoke(e);
-                        running = false;
-                    }
-                }
-            }
-
-            private void AdjustBufferSize(int size)
-            {
-                if (size > MAX_MSG_SIZE)
-                    throw new Exception($"Message size of '{size}' is too big! Max message size is '{MAX_MSG_SIZE}'")
-                if (readBuffer.Length >= size) return;
-
-                Array.Resize(ref readBuffer, size);
-
-            }
+            running = false;
+            listener.Stop();
+            clientAcceptor.Wait(2000);
+            clientAcceptor.Dispose();
         }
     }
 }

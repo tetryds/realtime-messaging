@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace tetryds.RealtimeMessaging.Buffer
+namespace tetryds.RealtimeMessaging.MemoryManagement
 {
     public class WriteBuffer
     {
