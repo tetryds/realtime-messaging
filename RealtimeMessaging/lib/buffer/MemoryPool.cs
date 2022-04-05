@@ -9,6 +9,7 @@ namespace tetryds.RealtimeMessaging.MemoryManagement
     public class MemoryPool : IDisposable
     {
         //TODO: Use RecyclableMemoryStream
+        //TODO: Trim big memorystream objects
         ConcurrentStack<MemoryStream> memoryStreams = new ConcurrentStack<MemoryStream>();
 
         public MemoryStream Pop()

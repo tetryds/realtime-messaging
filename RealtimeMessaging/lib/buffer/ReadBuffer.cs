@@ -7,6 +7,7 @@ namespace tetryds.RealtimeMessaging.MemoryManagement
 {
     public class ReadBuffer : IDisposable
     {
+        //TODO: Dispose logic
         readonly MemoryStream memoryStream;
         readonly MemoryPool memoryPool;
 

@@ -71,18 +71,6 @@ namespace tetryds.Tests.Standard
 
             disposables.Add(server);
 
-            client.ErrorOcurred += e =>
-            {
-                Console.WriteLine("Client error:");
-                Console.WriteLine(e);
-            };
-
-            server.ErrorOcurred += e =>
-            {
-                Console.WriteLine("Server error:");
-                Console.WriteLine(e);
-            };
-
             AutoResetEvent serverReceived = new AutoResetEvent(false);
             AutoResetEvent clientReceived = new AutoResetEvent(false);
 
