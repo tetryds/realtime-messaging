@@ -48,8 +48,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="tests\modules\socket\SocketClientGatewayTests.cs" />
     <Compile Include="tests\modules\socket\SocketTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="tests\tools\SimpleMessage.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

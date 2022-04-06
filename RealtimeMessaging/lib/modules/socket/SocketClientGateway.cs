@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
 using tetryds.RealtimeMessaging.MemoryManagement;
@@ -8,13 +9,16 @@ namespace tetryds.RealtimeMessaging.Network
 {
     public class SocketClientGateway<T> : IGateway<T>, IDisposable where T : IMessage, new()
     {
-        string host;
-        int port;
-        Socket socket;
+        readonly string host;
+        readonly int port;
+        readonly Socket socket;
 
         SocketClient client;
         MemoryPool memoryPool;
 
+        ConcurrentQueue<T> receivedMessages = new ConcurrentQueue<T>();
+
+        bool disposed = false;
 
         public SocketClientGateway(int port, string host)
         {
@@ -25,6 +29,8 @@ namespace tetryds.RealtimeMessaging.Network
 
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             client = new SocketClient(socket, memoryPool);
+
+            client.MessageRead += AddMessage;
         }
 
         public void Connect()
@@ -35,7 +41,7 @@ namespace tetryds.RealtimeMessaging.Network
 
         public bool ReleaseId(int id)
         {
-            throw new NotImplementedException();
+            return true;
         }
 
         public void Send(T message)
@@ -43,16 +49,30 @@ namespace tetryds.RealtimeMessaging.Network
             MemoryStream memoryStream = memoryPool.Pop();
             message.WriteToBuffer(new WriteBuffer(memoryStream));
             memoryStream.Position = 0;
-            client.Send(new ReadBuffer(memoryStream, memoryPool));
+            ReadBuffer readBuffer = new ReadBuffer(memoryStream, memoryPool);
+            client.Send(readBuffer);
+            readBuffer.Dispose();
         }
 
         public bool TryGet(out T message)
         {
-            throw new NotImplementedException();
+            return receivedMessages.TryDequeue(out message);
+        }
+
+        private void AddMessage(ReadBuffer readBuffer)
+        {
+            T message = new T();
+            message.ReadFromBuffer(readBuffer);
+            receivedMessages.Enqueue(message);
+            readBuffer.Dispose();
         }
 
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
+
+            client.MessageRead -= AddMessage;
             client.Dispose();
             memoryPool.Dispose();
         }
