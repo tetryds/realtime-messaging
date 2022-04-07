@@ -11,14 +11,16 @@ namespace tetryds.RealtimeMessaging.Network
     {
         readonly string host;
         readonly int port;
-        readonly Socket socket;
+
+        MemoryPool memoryPool;
 
         SocketClient client;
-        MemoryPool memoryPool;
 
         ConcurrentQueue<T> receivedMessages = new ConcurrentQueue<T>();
 
         bool disposed = false;
+
+        public bool Connected => client?.Connected ?? false;
 
         public SocketClientGateway(int port, string host)
         {
@@ -26,26 +28,37 @@ namespace tetryds.RealtimeMessaging.Network
             this.host = host;
 
             memoryPool = new MemoryPool();
-
-            socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            client = new SocketClient(socket, memoryPool);
-
-            client.MessageRead += AddMessage;
         }
 
         public void Connect()
         {
+            if (Connected) return;
+
+            Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            client = new SocketClient(socket, memoryPool);
+
+            client.MessageRead += AddMessage;
+            client.SocketShutdown += e => Disconnect();
+
             socket.Connect(host, port);
             client.Start();
         }
 
-        public bool ReleaseId(int id)
+        public void Disconnect()
         {
-            return true;
+            if (!Connected) return;
+
+            client.MessageRead -= AddMessage;
+            client.Dispose();
+
+            client = null;
         }
 
         public void Send(T message)
         {
+            if (!Connected)
+                throw new SourceNotConnectedException();
+
             MemoryStream memoryStream = memoryPool.Pop();
             message.WriteToBuffer(new WriteBuffer(memoryStream));
             memoryStream.Position = 0;
@@ -59,9 +72,18 @@ namespace tetryds.RealtimeMessaging.Network
             return receivedMessages.TryDequeue(out message);
         }
 
+        public bool DropSource(Guid id)
+        {
+            if (!Connected) return false;
+
+            Disconnect();
+            return true;
+        }
+
         private void AddMessage(ReadBuffer readBuffer)
         {
             T message = new T();
+            message.SourceId = Guid.Empty;
             message.ReadFromBuffer(readBuffer);
             receivedMessages.Enqueue(message);
             readBuffer.Dispose();
@@ -72,8 +94,11 @@ namespace tetryds.RealtimeMessaging.Network
             if (disposed) return;
             disposed = true;
 
-            client.MessageRead -= AddMessage;
-            client.Dispose();
+            if (client != null)
+            {
+                client.MessageRead -= AddMessage;
+                client.Dispose();
+            }
             memoryPool.Dispose();
         }
     }

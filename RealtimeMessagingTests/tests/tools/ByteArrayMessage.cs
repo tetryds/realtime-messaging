@@ -13,30 +13,34 @@ using tetryds.RealtimeMessaging.Network.Internal;
 
 namespace tetryds.Tests.Tools
 {
-    public class SimpleMessage : IMessage
+    public class ByteArrayMessage : IMessage
     {
-        public string Message { get; set; }
+        public byte[] Data;
 
-        public Guid SourceId { get; set; }
+        public Guid SourceId { get; set; } = Guid.Empty;
 
-        public SimpleMessage() { }
+        public ByteArrayMessage() { }
 
-        public SimpleMessage(string message)
+        public ByteArrayMessage(byte[] data)
         {
-            Message = message;
+            Data = data;
+        }
+
+        public ByteArrayMessage(byte[] data, Guid sourceId)
+        {
+            Data = data;
+            SourceId = sourceId;
         }
 
         public void ReadFromBuffer(ReadBuffer reader)
         {
-            byte[] buffer = new byte[reader.Length];
-            reader.Read(buffer, 0, buffer.Length);
-            Message = Encoding.UTF8.GetString(buffer);
+            Data = new byte[reader.Length];
+            reader.Read(Data, 0, Data.Length);
         }
 
         public void WriteToBuffer(WriteBuffer writer)
         {
-            byte[] buffer = Encoding.UTF8.GetBytes(Message);
-            writer.Write(buffer, 0, buffer.Length);
+            writer.Write(Data, 0, Data.Length);
         }
     }
 }

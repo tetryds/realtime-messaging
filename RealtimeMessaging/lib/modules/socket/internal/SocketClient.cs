@@ -27,6 +27,8 @@ namespace tetryds.RealtimeMessaging.Network.Internal
         public event Action<ReadBuffer> MessageRead;
         public event Action<Exception> SocketShutdown;
 
+        public bool Connected => socket?.Connected ?? false;
+
         public SocketClient(Socket socket, MemoryPool memoryPool)
         {
             this.socket = socket;

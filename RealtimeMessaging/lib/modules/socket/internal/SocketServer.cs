@@ -9,14 +9,11 @@ namespace tetryds.RealtimeMessaging.Network.Internal
 {
     public class SocketServer : IDisposable
     {
-        const int MAX_MSG_SIZE = 65536;
-
         readonly int port;
         readonly MemoryPool memoryPool;
 
-        Task clientAcceptor;
-
         TcpListener listener;
+        Task clientAcceptor;
 
         volatile bool running = false;
 

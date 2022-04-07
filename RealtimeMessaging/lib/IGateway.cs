@@ -7,6 +7,6 @@ namespace tetryds.RealtimeMessaging
         void Connect();
         void Send(T message);
         bool TryGet(out T message);
-        bool ReleaseId(int id);
+        bool DropSource(Guid id);
     }
 }

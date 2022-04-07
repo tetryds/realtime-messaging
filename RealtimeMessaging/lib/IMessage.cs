@@ -1,11 +1,11 @@
-﻿using System.IO;
+﻿using System;
 using tetryds.RealtimeMessaging.MemoryManagement;
 
 namespace tetryds.RealtimeMessaging
 {
     public interface IMessage
     {
-        int Id { get; set; }
+        Guid SourceId { get; set; }
         void ReadFromBuffer(ReadBuffer reader);
         void WriteToBuffer(WriteBuffer writer);
     }
