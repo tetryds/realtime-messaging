@@ -62,7 +62,7 @@ namespace tetryds.Tests.Standard
             SocketClientGateway<SimpleMessage> clientGateway = new SocketClientGateway<SimpleMessage>(Port, "localhost");
             disposables.Add(clientGateway);
 
-            clientGateway.Connect();
+            clientGateway.Start();
             Assert.IsTrue(clientConnected.WaitOne(100));
 
             AutoResetEvent serverReceived = new AutoResetEvent(false);

@@ -2,10 +2,10 @@
 using System.Net.Sockets;
 using System.Runtime.Serialization;
 
-namespace tetryds.RealtimeMessaging.Network.Errors
+namespace tetryds.RealtimeMessaging.Network.Exceptions
 {
     [Serializable]
-    internal class SocketConnectionException : Exception
+    public class SocketConnectionException : Exception
     {
         public readonly SocketError Error;
 

@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using tetryds.RealtimeMessaging.MemoryManagement;
-using tetryds.RealtimeMessaging.Network.Errors;
+using tetryds.RealtimeMessaging.Network.Exceptions;
 
 namespace tetryds.RealtimeMessaging.Network.Internal
 {
@@ -123,10 +123,13 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             disposed = true;
 
             running = false;
-            socket.Disconnect(false);
-            socket.Dispose();
-            listener.Wait(2000);
-            listener.Dispose();
+            socket?.Disconnect(false);
+            socket?.Dispose();
+            listener?.Wait(2000);
+            listener?.Dispose();
+
+            MessageRead = null;
+            SocketShutdown = null;
         }
     }
 }

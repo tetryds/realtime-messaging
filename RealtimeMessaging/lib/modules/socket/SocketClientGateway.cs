@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
 using tetryds.RealtimeMessaging.MemoryManagement;
+using tetryds.RealtimeMessaging.Network.Exceptions;
 using tetryds.RealtimeMessaging.Network.Internal;
 
 namespace tetryds.RealtimeMessaging.Network
@@ -30,10 +31,8 @@ namespace tetryds.RealtimeMessaging.Network
             memoryPool = new MemoryPool();
         }
 
-        public void Connect()
+        public void Start()
         {
-            if (Connected) return;
-
             Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             client = new SocketClient(socket, memoryPool);
 
@@ -46,8 +45,6 @@ namespace tetryds.RealtimeMessaging.Network
 
         public void Disconnect()
         {
-            if (!Connected) return;
-
             client.MessageRead -= AddMessage;
             client.Dispose();
 
@@ -57,7 +54,7 @@ namespace tetryds.RealtimeMessaging.Network
         public void Send(T message)
         {
             if (!Connected)
-                throw new SourceNotConnectedException();
+                throw new RemoteNotConnectedException();
 
             MemoryStream memoryStream = memoryPool.Pop();
             message.WriteToBuffer(new WriteBuffer(memoryStream));
@@ -83,7 +80,7 @@ namespace tetryds.RealtimeMessaging.Network
         private void AddMessage(ReadBuffer readBuffer)
         {
             T message = new T();
-            message.SourceId = Guid.Empty;
+            message.RemoteId = Guid.Empty;
             message.ReadFromBuffer(readBuffer);
             receivedMessages.Enqueue(message);
             readBuffer.Dispose();
@@ -94,11 +91,7 @@ namespace tetryds.RealtimeMessaging.Network
             if (disposed) return;
             disposed = true;
 
-            if (client != null)
-            {
-                client.MessageRead -= AddMessage;
-                client.Dispose();
-            }
+            client?.Dispose();
             memoryPool.Dispose();
         }
     }

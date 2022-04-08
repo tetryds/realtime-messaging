@@ -5,7 +5,7 @@ namespace tetryds.RealtimeMessaging
 {
     public interface IMessage
     {
-        Guid SourceId { get; set; }
+        Guid RemoteId { get; set; }
         void ReadFromBuffer(ReadBuffer reader);
         void WriteToBuffer(WriteBuffer writer);
     }

@@ -17,7 +17,7 @@ namespace tetryds.Tests.Tools
     {
         public string Message { get; set; }
 
-        public Guid SourceId { get; set; }
+        public Guid RemoteId { get; set; }
 
         public SimpleMessage() { }
 

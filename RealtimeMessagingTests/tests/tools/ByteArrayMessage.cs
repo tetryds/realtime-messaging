@@ -17,7 +17,7 @@ namespace tetryds.Tests.Tools
     {
         public byte[] Data;
 
-        public Guid SourceId { get; set; } = Guid.Empty;
+        public Guid RemoteId { get; set; } = Guid.Empty;
 
         public ByteArrayMessage() { }
 
@@ -29,7 +29,7 @@ namespace tetryds.Tests.Tools
         public ByteArrayMessage(byte[] data, Guid sourceId)
         {
             Data = data;
-            SourceId = sourceId;
+            RemoteId = sourceId;
         }
 
         public void ReadFromBuffer(ReadBuffer reader)

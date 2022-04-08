@@ -4,11 +4,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using tetryds.RealtimeMessaging.MemoryManagement;
+using tetryds.RealtimeMessaging.Network.Exceptions;
 using tetryds.RealtimeMessaging.Network.Internal;
 
 namespace tetryds.RealtimeMessaging.Network
 {
-    public class SocketServerGateway<T> : IDisposable, IGateway<T> where T : IMessage, new()
+    public class SocketServerGateway<T> : IGateway<T>, IDisposable where T : IMessage, new()
     {
         readonly int port;
         readonly MemoryPool memoryPool;
@@ -17,6 +18,8 @@ namespace tetryds.RealtimeMessaging.Network
 
         readonly ConcurrentQueue<T> receivedMessages;
         readonly ConcurrentDictionary<Guid, SocketClient> clientMap;
+
+        public event Action<Exception> ErrorOccurred;
 
         public SocketServerGateway(int port)
         {
@@ -29,17 +32,18 @@ namespace tetryds.RealtimeMessaging.Network
             socketServer = new SocketServer(port, memoryPool);
 
             socketServer.ClientConnected += RegisterClient;
+            socketServer.ErrorOcurred += ErrorOccurred;
         }
 
-        public void Connect()
+        public void Start()
         {
             socketServer.Start();
         }
 
         public void Send(T message)
         {
-            if (!clientMap.TryGetValue(message.SourceId, out SocketClient client))
-                throw new SourceNotConnectedException(message.SourceId);
+            if (!clientMap.TryGetValue(message.RemoteId, out SocketClient client))
+                throw new RemoteNotConnectedException(message.RemoteId);
 
             SendToClient(message, client);
         }
@@ -49,6 +53,7 @@ namespace tetryds.RealtimeMessaging.Network
             return receivedMessages.TryDequeue(out message);
         }
 
+
         public bool DropSource(Guid clientId)
         {
             if (!clientMap.TryRemove(clientId, out SocketClient client)) return false;
@@ -56,6 +61,9 @@ namespace tetryds.RealtimeMessaging.Network
             client.Dispose();
             return true;
         }
+
+        public List<Guid> GetSourceIds() => clientMap.Keys.ToList();
+        public int SourceCount => clientMap.Count;
 
         private void RegisterClient(SocketClient client)
         {
@@ -78,7 +86,7 @@ namespace tetryds.RealtimeMessaging.Network
         private void AddMessage(Guid clientId, ReadBuffer readBuffer)
         {
             T message = new T();
-            message.SourceId = clientId;
+            message.RemoteId = clientId;
             message.ReadFromBuffer(readBuffer);
             receivedMessages.Enqueue(message);
             readBuffer.Dispose();
