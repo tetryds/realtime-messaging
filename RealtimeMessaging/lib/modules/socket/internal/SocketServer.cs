@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using tetryds.RealtimeMessaging.MemoryManagement;
 
@@ -13,9 +15,10 @@ namespace tetryds.RealtimeMessaging.Network.Internal
         readonly MemoryPool memoryPool;
 
         TcpListener listener;
-        Task clientAcceptor;
+        Thread acceptor;
 
         volatile bool running = false;
+        volatile bool disposed = false;
 
         public event Action<SocketClient> ClientConnected;
         public event Action<Exception> ErrorOcurred;
@@ -28,16 +31,17 @@ namespace tetryds.RealtimeMessaging.Network.Internal
 
         public void Start()
         {
-            if (running)
-                throw new InvalidOperationException("Socket server already running!");
+            EnsureState(nameof(Start), false);
             running = true;
 
             IPAddress address = IPAddress.Any;
             listener = new TcpListener(address, port);
             listener.Start();
 
-            clientAcceptor = new Task(DoAcceptClient, TaskCreationOptions.LongRunning);
-            clientAcceptor.Start();
+            acceptor = new Thread(DoAcceptClient);
+            acceptor.IsBackground = true;
+            acceptor.Priority = ThreadPriority.BelowNormal;
+            acceptor.Start();
         }
 
         private void DoAcceptClient()
@@ -58,12 +62,26 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void EnsureState(string operation, bool shouldBeRunning)
+        {
+            if (disposed)
+                throw new ObjectDisposedException($"Cannot execute '{operation}', socket client has been disposed and cannot be reused");
+            if (running != shouldBeRunning)
+                throw new InvalidOperationException($"Cannot execute '{operation}', socket client is {(shouldBeRunning ? "not " : "")}running");
+        }
+
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
+
             running = false;
-            listener.Stop();
-            clientAcceptor.Wait(2000);
-            clientAcceptor.Dispose();
+            listener?.Stop();
+            acceptor.Join(2000);
+
+            ClientConnected = null;
+            ErrorOcurred = null;
         }
     }
 }

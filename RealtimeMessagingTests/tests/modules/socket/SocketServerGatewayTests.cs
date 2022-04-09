@@ -110,6 +110,8 @@ namespace tetryds.Tests.Standard
 
             Assert.IsTrue(TryGetTimeout(client2, TimeoutMs, out ByteArrayMessage arrived4));
             CollectionAssert.AreEqual(request4.Data, arrived4.Data);
+
+            Assert.AreEqual(2, server.SourceCount);
         }
 
         [Test]

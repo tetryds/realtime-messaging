@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using tetryds.RealtimeMessaging.MemoryManagement;
 using tetryds.RealtimeMessaging.Network.Exceptions;
 using tetryds.RealtimeMessaging.Network.Internal;
@@ -19,20 +20,26 @@ namespace tetryds.RealtimeMessaging.Network
 
         ConcurrentQueue<T> receivedMessages = new ConcurrentQueue<T>();
 
-        bool disposed = false;
+        volatile bool disposed = false;
+        volatile bool running = false;
 
         public bool Connected => client?.Connected ?? false;
 
-        public SocketClientGateway(int port, string host)
+        public SocketClientGateway(int port, string host) : this(port, host, new MemoryPool()) { }
+
+        public SocketClientGateway(int port, string host, MemoryPool memoryPool)
         {
             this.port = port;
             this.host = host;
 
-            memoryPool = new MemoryPool();
+            this.memoryPool = memoryPool;
         }
 
         public void Start()
         {
+            EnsureState(nameof(Start), false, false);
+            running = true;
+
             Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             client = new SocketClient(socket, memoryPool);
 
@@ -45,7 +52,6 @@ namespace tetryds.RealtimeMessaging.Network
 
         public void Disconnect()
         {
-            client.MessageRead -= AddMessage;
             client.Dispose();
 
             client = null;
@@ -53,8 +59,7 @@ namespace tetryds.RealtimeMessaging.Network
 
         public void Send(T message)
         {
-            if (!Connected)
-                throw new RemoteNotConnectedException();
+            EnsureState(nameof(Send), true, true);
 
             MemoryStream memoryStream = memoryPool.Pop();
             message.WriteToBuffer(new WriteBuffer(memoryStream));
@@ -86,11 +91,23 @@ namespace tetryds.RealtimeMessaging.Network
             readBuffer.Dispose();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void EnsureState(string operation, bool shouldBeRunning, bool shouldBeConnected)
+        {
+            if (disposed)
+                throw new ObjectDisposedException($"Cannot execute '{operation}', socket client has been disposed and cannot be reused");
+            if (running != shouldBeRunning)
+                throw new InvalidOperationException($"Cannot execute '{operation}', socket client is {(shouldBeRunning ? "not " : "")}running");
+            if (Connected != shouldBeConnected)
+                throw new InvalidOperationException($"Cannot execute '{operation}', socket is {(shouldBeConnected ? "not " : "")}connected");
+        }
+
         public void Dispose()
         {
             if (disposed) return;
             disposed = true;
 
+            running = false;
             client?.Dispose();
             memoryPool.Dispose();
         }

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using tetryds.RealtimeMessaging.MemoryManagement;
 using tetryds.RealtimeMessaging.Network.Exceptions;
 using tetryds.RealtimeMessaging.Network.Internal;
@@ -11,7 +12,6 @@ namespace tetryds.RealtimeMessaging.Network
 {
     public class SocketServerGateway<T> : IGateway<T>, IDisposable where T : IMessage, new()
     {
-        readonly int port;
         readonly MemoryPool memoryPool;
 
         readonly SocketServer socketServer;
@@ -19,16 +19,18 @@ namespace tetryds.RealtimeMessaging.Network
         readonly ConcurrentQueue<T> receivedMessages;
         readonly ConcurrentDictionary<Guid, SocketClient> clientMap;
 
+        bool disposed = false;
+
         public event Action<Exception> ErrorOccurred;
 
-        public SocketServerGateway(int port)
-        {
-            this.port = port;
+        public SocketServerGateway(int port) : this(port, new MemoryPool()) { }
 
+        public SocketServerGateway(int port, MemoryPool memoryPool)
+        {
             receivedMessages = new ConcurrentQueue<T>();
             clientMap = new ConcurrentDictionary<Guid, SocketClient>();
 
-            memoryPool = new MemoryPool();
+            this.memoryPool = memoryPool;
             socketServer = new SocketServer(port, memoryPool);
 
             socketServer.ClientConnected += RegisterClient;
@@ -85,15 +87,21 @@ namespace tetryds.RealtimeMessaging.Network
 
         private void AddMessage(Guid clientId, ReadBuffer readBuffer)
         {
-            T message = new T();
-            message.RemoteId = clientId;
-            message.ReadFromBuffer(readBuffer);
-            receivedMessages.Enqueue(message);
-            readBuffer.Dispose();
+            Task.Run(() =>
+            {
+                T message = new T();
+                message.RemoteId = clientId;
+                message.ReadFromBuffer(readBuffer);
+                receivedMessages.Enqueue(message);
+                readBuffer.Dispose();
+            });
         }
 
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
+
             socketServer.Dispose();
             foreach (Guid clientId in clientMap.Keys)
             {

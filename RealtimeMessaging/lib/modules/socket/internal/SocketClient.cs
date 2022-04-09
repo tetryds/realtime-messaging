@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using tetryds.RealtimeMessaging.MemoryManagement;
 using tetryds.RealtimeMessaging.Network.Exceptions;
@@ -15,7 +16,8 @@ namespace tetryds.RealtimeMessaging.Network.Internal
         Socket socket;
         MemoryPool memoryPool;
 
-        Task listener;
+        //Task listener;
+        Thread listener;
 
         volatile bool running = false;
         volatile bool disposed = false;
@@ -37,27 +39,34 @@ namespace tetryds.RealtimeMessaging.Network.Internal
 
         public void Start()
         {
-            EnsureNotDisposed();
+            EnsureState(nameof(Start), false);
             if (!socket.Connected)
                 throw new Exception("Cannot start, socket not connected!");
             if (running) return;
 
             running = true;
-            listener = new Task(DoListen, TaskCreationOptions.LongRunning);
+            listener = new Thread(DoListen);
+            listener.Priority = ThreadPriority.Highest;
+            listener.IsBackground = true;
             listener.Start();
         }
 
         public void Send(ReadBuffer buffer)
         {
-            EnsureNotDisposed();
+            EnsureState(nameof(Send), true);
             byte[] len = BitConverter.GetBytes((int)buffer.Length);
-            //Console.WriteLine($"Sending message of '{(int)buffer.Length}'");
+            int read;
             socket.Send(len);
-            int read = 0;
+
+            int left = (int)buffer.Length;
+            int count = 0;
             while ((read = buffer.Read(sendBuffer)) > 0)
             {
-                //Console.WriteLine($"Send buffer: '{string.Join("-", sendBuffer)}'");
                 socket.Send(sendBuffer, read, SocketFlags.None);
+                count++;
+                count %= 500;
+                if (count == 0)
+                    Thread.Sleep(1);
             }
         }
 
@@ -68,7 +77,6 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             {
                 try
                 {
-                    //Console.WriteLine($"Ready to receive message size");
                     int count = socket.Receive(lenBuffer, 0, sizeof(int), SocketFlags.None, out error);
                     if (error != SocketError.Success)
                         throw new SocketConnectionException(error);
@@ -83,19 +91,15 @@ namespace tetryds.RealtimeMessaging.Network.Internal
                     int remaining = len;
 
                     MemoryStream memoryStream = memoryPool.Pop();
-                    //Console.WriteLine($"Message of size '{len}' being received");
+                    memoryStream.Capacity = len;
                     do
                     {
                         int toRead = readBuffer.Length > remaining ? remaining : readBuffer.Length;
-                        //Console.WriteLine($"Reading '{toRead}' bytes, '{remaining}' remaining");
                         int read = socket.Receive(readBuffer, 0, toRead, SocketFlags.None);
-                        //Console.WriteLine($"Read buffer: '{string.Join("-", readBuffer)}'");
                         memoryStream.Write(readBuffer, 0, read);
                         remaining -= read;
                     }
                     while (remaining > 0);
-
-                    //Console.WriteLine($"Message read");
 
                     memoryStream.Position = 0;
                     MessageRead?.Invoke(new ReadBuffer(memoryStream, memoryPool));
@@ -103,7 +107,6 @@ namespace tetryds.RealtimeMessaging.Network.Internal
                 }
                 catch (Exception e)
                 {
-                    //Console.WriteLine($"Socket Shutdown");
                     SocketShutdown?.Invoke(e);
                     Dispose();
                 }
@@ -111,10 +114,12 @@ namespace tetryds.RealtimeMessaging.Network.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EnsureNotDisposed()
+        private void EnsureState(string operation, bool shouldBeRunning)
         {
             if (disposed)
-                throw new ObjectDisposedException("Socket client has been disposed and cannot be reused");
+                throw new ObjectDisposedException($"Cannot execute '{operation}', socket client has been disposed and cannot be reused");
+            if (running != shouldBeRunning)
+                throw new InvalidOperationException($"Cannot execute '{operation}', socket client is {(shouldBeRunning ? "not " : "")}running");
         }
 
         public void Dispose()
@@ -125,8 +130,9 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             running = false;
             socket?.Disconnect(false);
             socket?.Dispose();
-            listener?.Wait(2000);
-            listener?.Dispose();
+            listener.Join(2000);
+            //listener?.Wait(2000);
+            //listener?.Dispose();
 
             MessageRead = null;
             SocketShutdown = null;
