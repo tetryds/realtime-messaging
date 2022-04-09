@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using tetryds.RealtimeMessaging.MemoryManagement;
 using tetryds.RealtimeMessaging.Network.Exceptions;
@@ -18,6 +19,7 @@ namespace tetryds.RealtimeMessaging.Network
 
         readonly ConcurrentQueue<T> receivedMessages;
         readonly ConcurrentDictionary<Guid, SocketClient> clientMap;
+        AutoResetEvent messageReceivedEvent = new AutoResetEvent(false);
 
         bool disposed = false;
 
@@ -50,11 +52,13 @@ namespace tetryds.RealtimeMessaging.Network
             SendToClient(message, client);
         }
 
-        public bool TryGet(out T message)
+        public bool TryGet(int millisecondsTimeout, out T message)
         {
+            if (receivedMessages.TryDequeue(out message)) return true;
+
+            messageReceivedEvent.WaitOne(millisecondsTimeout);
             return receivedMessages.TryDequeue(out message);
         }
-
 
         public bool DropSource(Guid clientId)
         {
@@ -93,6 +97,7 @@ namespace tetryds.RealtimeMessaging.Network
                 message.RemoteId = clientId;
                 message.ReadFromBuffer(readBuffer);
                 receivedMessages.Enqueue(message);
+                messageReceivedEvent.Set();
                 readBuffer.Dispose();
             });
         }

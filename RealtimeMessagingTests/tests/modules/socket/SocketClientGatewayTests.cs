@@ -95,10 +95,7 @@ namespace tetryds.Tests.Standard
             ReadBuffer readBuffer2 = GetReadBuffer(Encoding.UTF8.GetBytes(LongMsg), memoryPool);
             server.Send(readBuffer2);
 
-            Task timeout = Task.Delay(100);
-            SimpleMessage message2;
-            while (!clientGateway.TryGet(out message2) && !timeout.IsCompleted) { }
-            Assert.False(timeout.IsCompleted);
+            Assert.True(clientGateway.TryGet(100, out SimpleMessage message2));
             Assert.NotNull(message2);
 
             Assert.AreEqual(LongMsg, message2.Message);

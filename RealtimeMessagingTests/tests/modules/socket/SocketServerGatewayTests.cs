@@ -54,7 +54,7 @@ namespace tetryds.Tests.Standard
 
             client1.Send(request1);
 
-            Assert.IsTrue(TryGetTimeout(server, TimeoutMs, out ByteArrayMessage arrived1));
+            Assert.IsTrue(server.TryGet(TimeoutMs, out ByteArrayMessage arrived1));
             CollectionAssert.AreEqual(request1.Data, arrived1.Data);
 
             Guid client1Id = arrived1.RemoteId;
@@ -62,7 +62,7 @@ namespace tetryds.Tests.Standard
             ByteArrayMessage request2 = new ByteArrayMessage(GetRandomBytes(MessageSizeHuge), client1Id);
             server.Send(request2);
 
-            Assert.IsTrue(TryGetTimeout(client1, TimeoutMs, out ByteArrayMessage arrived2));
+            Assert.IsTrue(client1.TryGet(TimeoutMs, out ByteArrayMessage arrived2));
             CollectionAssert.AreEqual(request2.Data, arrived2.Data);
         }
 
@@ -84,7 +84,7 @@ namespace tetryds.Tests.Standard
 
             client1.Send(request1);
 
-            Assert.IsTrue(TryGetTimeout(server, TimeoutMs, out ByteArrayMessage arrived1));
+            Assert.IsTrue(server.TryGet(TimeoutMs, out ByteArrayMessage arrived1));
             CollectionAssert.AreEqual(request1.Data, arrived1.Data);
 
             Guid client1Id = arrived1.RemoteId;
@@ -92,7 +92,7 @@ namespace tetryds.Tests.Standard
             ByteArrayMessage request2 = new ByteArrayMessage(GetRandomBytes(MessageSizeHuge), client1Id);
             server.Send(request2);
 
-            Assert.IsTrue(TryGetTimeout(client1, TimeoutMs, out ByteArrayMessage arrived2));
+            Assert.IsTrue(client1.TryGet(TimeoutMs, out ByteArrayMessage arrived2));
             CollectionAssert.AreEqual(request2.Data, arrived2.Data);
 
             client2.Start();
@@ -100,7 +100,7 @@ namespace tetryds.Tests.Standard
             ByteArrayMessage request3 = new ByteArrayMessage(GetRandomBytes(MessageSizeHuge));
             client2.Send(request3);
 
-            Assert.IsTrue(TryGetTimeout(server, TimeoutMs, out ByteArrayMessage arrived3));
+            Assert.IsTrue(server.TryGet(TimeoutMs, out ByteArrayMessage arrived3));
             CollectionAssert.AreEqual(request3.Data, arrived3.Data);
 
             Guid client2Id = arrived3.RemoteId;
@@ -108,7 +108,8 @@ namespace tetryds.Tests.Standard
             ByteArrayMessage request4 = new ByteArrayMessage(GetRandomBytes(MessageSizeHuge), client2Id);
             server.Send(request4);
 
-            Assert.IsTrue(TryGetTimeout(client2, TimeoutMs, out ByteArrayMessage arrived4));
+            Assert.IsTrue(client2.TryGet(TimeoutMs, out ByteArrayMessage arrived4));
+
             CollectionAssert.AreEqual(request4.Data, arrived4.Data);
 
             Assert.AreEqual(2, server.SourceCount);
@@ -167,13 +168,6 @@ namespace tetryds.Tests.Standard
         public void Teardown()
         {
             disposables.ForEach(d => d.Dispose());
-        }
-
-        private bool TryGetTimeout<T>(IGateway<T> gateway, int timeoutMs, out T msg) where T : IMessage, new()
-        {
-            Task timeoutTask = Task.Delay(timeoutMs);
-            while (!gateway.TryGet(out msg) && !timeoutTask.IsCompleted) { Thread.Sleep(SleepMs); }
-            return !timeoutTask.IsCompleted;
         }
 
         private byte[] GetRandomBytes(int size)

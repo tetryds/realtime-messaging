@@ -12,6 +12,8 @@ namespace tetryds.RealtimeMessaging.MemoryManagement
         readonly MemoryPool memoryPool;
 
         public long Length => memoryStream.Length;
+        public long Position => memoryStream.Position;
+        public long Remaining => Length - Position;
 
         public ReadBuffer(MemoryStream memoryStream, MemoryPool memoryPool)
         {

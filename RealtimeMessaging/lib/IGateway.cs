@@ -6,7 +6,7 @@ namespace tetryds.RealtimeMessaging
     {
         void Start();
         void Send(T message);
-        bool TryGet(out T message);
+        bool TryGet(int millisecondsTimeout, out T message);
         bool DropSource(Guid id);
     }
 }

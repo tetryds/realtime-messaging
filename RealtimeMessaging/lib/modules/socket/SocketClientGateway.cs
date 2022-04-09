@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using tetryds.RealtimeMessaging.MemoryManagement;
 using tetryds.RealtimeMessaging.Network.Exceptions;
 using tetryds.RealtimeMessaging.Network.Internal;
@@ -19,6 +21,7 @@ namespace tetryds.RealtimeMessaging.Network
         SocketClient client;
 
         ConcurrentQueue<T> receivedMessages = new ConcurrentQueue<T>();
+        AutoResetEvent messageReceivedEvent = new AutoResetEvent(false);
 
         volatile bool disposed = false;
         volatile bool running = false;
@@ -69,8 +72,11 @@ namespace tetryds.RealtimeMessaging.Network
             readBuffer.Dispose();
         }
 
-        public bool TryGet(out T message)
+        public bool TryGet(int millisecondsTimeout, out T message)
         {
+            if (receivedMessages.TryDequeue(out message)) return true;
+
+            messageReceivedEvent.WaitOne(millisecondsTimeout);
             return receivedMessages.TryDequeue(out message);
         }
 
@@ -84,11 +90,15 @@ namespace tetryds.RealtimeMessaging.Network
 
         private void AddMessage(ReadBuffer readBuffer)
         {
-            T message = new T();
-            message.RemoteId = Guid.Empty;
-            message.ReadFromBuffer(readBuffer);
-            receivedMessages.Enqueue(message);
-            readBuffer.Dispose();
+            Task.Run(() =>
+            {
+                T message = new T();
+                message.RemoteId = Guid.Empty;
+                message.ReadFromBuffer(readBuffer);
+                receivedMessages.Enqueue(message);
+                messageReceivedEvent.Set();
+                readBuffer.Dispose();
+            });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
