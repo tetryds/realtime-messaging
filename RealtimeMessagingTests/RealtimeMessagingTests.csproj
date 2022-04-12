@@ -48,6 +48,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="tests\modules\socket\SocketFlowTests.cs" />
     <Compile Include="tests\modules\socket\SocketServerGatewayTests.cs" />
     <Compile Include="tests\modules\socket\SocketClientGatewayTests.cs" />
     <Compile Include="tests\modules\socket\SocketTests.cs" />

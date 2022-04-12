@@ -75,7 +75,11 @@ namespace tetryds.RealtimeMessaging.Network
         {
             Guid clientId = Guid.NewGuid();
             client.MessageRead += m => AddMessage(clientId, m);
-            client.SocketShutdown += e => DropSource(clientId);
+            client.SocketShutdown += e =>
+            {
+                DropSource(clientId);
+                ErrorOccurred(e);
+            };
             clientMap.TryAdd(clientId, client);
         }
 
@@ -91,15 +95,12 @@ namespace tetryds.RealtimeMessaging.Network
 
         private void AddMessage(Guid clientId, ReadBuffer readBuffer)
         {
-            Task.Run(() =>
-            {
-                T message = new T();
-                message.RemoteId = clientId;
-                message.ReadFromBuffer(readBuffer);
-                receivedMessages.Enqueue(message);
-                messageReceivedEvent.Set();
-                readBuffer.Dispose();
-            });
+            T message = new T();
+            message.RemoteId = clientId;
+            message.ReadFromBuffer(readBuffer);
+            receivedMessages.Enqueue(message);
+            messageReceivedEvent.Set();
+            readBuffer.Dispose();
         }
 
         public void Dispose()

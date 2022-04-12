@@ -13,6 +13,8 @@ namespace tetryds.RealtimeMessaging.Network.Internal
 {
     public class SocketClient : IDisposable
     {
+        const int LEN_SIZE = sizeof(int);
+        private const int BUFFER_SIZE = 4096;
         Socket socket;
         MemoryPool memoryPool;
 
@@ -22,9 +24,9 @@ namespace tetryds.RealtimeMessaging.Network.Internal
         volatile bool running = false;
         volatile bool disposed = false;
 
-        readonly byte[] lenBuffer = new byte[sizeof(int)];
-        readonly byte[] readBuffer = new byte[4096];
-        readonly byte[] sendBuffer = new byte[4096];
+        readonly byte[] lenBuffer = new byte[LEN_SIZE];
+        readonly byte[] readBuffer = new byte[BUFFER_SIZE];
+        readonly byte[] sendBuffer = new byte[BUFFER_SIZE];
 
         public event Action<ReadBuffer> MessageRead;
         public event Action<Exception> SocketShutdown;
@@ -46,7 +48,7 @@ namespace tetryds.RealtimeMessaging.Network.Internal
 
             running = true;
             listener = new Thread(DoListen);
-            listener.Priority = ThreadPriority.Highest;
+            listener.Priority = ThreadPriority.BelowNormal;
             listener.IsBackground = true;
             listener.Start();
         }
@@ -56,17 +58,12 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             EnsureState(nameof(Send), true);
             byte[] len = BitConverter.GetBytes((int)buffer.Length);
             int read;
-            socket.Send(len);
-
             int left = (int)buffer.Length;
-            int count = 0;
+
+            socket.Send(len);
             while ((read = buffer.Read(sendBuffer)) > 0)
             {
                 socket.Send(sendBuffer, read, SocketFlags.None);
-                count++;
-                count %= 500;
-                if (count == 0)
-                    Thread.Sleep(1);
             }
         }
 
@@ -77,13 +74,19 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             {
                 try
                 {
-                    int count = socket.Receive(lenBuffer, 0, sizeof(int), SocketFlags.None, out error);
-                    if (error != SocketError.Success)
-                        throw new SocketConnectionException(error);
-                    if (count != sizeof(int))
-                        throw new SocketConnectionException(error, "Wrong package length data!");
+                    int lenRead = 0;
+                    do
+                    {
+                        int read = socket.Receive(lenBuffer, lenRead, LEN_SIZE - lenRead, SocketFlags.None);
+                        lenRead += read;
+                    }
+                    while (lenRead < LEN_SIZE && socket.Connected);
+
+                    if (!socket.Connected) break;
 
                     int len = BitConverter.ToInt32(lenBuffer, 0);
+
+                    //Console.WriteLine($"Read len bytes: '{lenRead}', len size: '{len}'");
 
                     if (len < 0)
                         throw new SocketConnectionException(error, $"Package length cannot be negative! Given len '{len}'");
@@ -101,16 +104,20 @@ namespace tetryds.RealtimeMessaging.Network.Internal
                     }
                     while (remaining > 0);
 
+
                     memoryStream.Position = 0;
                     MessageRead?.Invoke(new ReadBuffer(memoryStream, memoryPool));
 
                 }
                 catch (Exception e)
                 {
+                    Console.WriteLine($"Socket error! {e}");
                     SocketShutdown?.Invoke(e);
                     Dispose();
                 }
             }
+
+            Console.WriteLine("Socket listener shutdown");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -128,11 +135,8 @@ namespace tetryds.RealtimeMessaging.Network.Internal
             disposed = true;
 
             running = false;
-            socket?.Disconnect(false);
-            socket?.Dispose();
-            listener.Join(2000);
-            //listener?.Wait(2000);
-            //listener?.Dispose();
+            socket?.Shutdown(System.Net.Sockets.SocketShutdown.Both);
+            listener?.Join(2000);
 
             MessageRead = null;
             SocketShutdown = null;

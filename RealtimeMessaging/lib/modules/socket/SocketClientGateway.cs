@@ -17,6 +17,7 @@ namespace tetryds.RealtimeMessaging.Network
         readonly int port;
 
         MemoryPool memoryPool;
+        readonly bool ownsMemoryPool = false;
 
         SocketClient client;
 
@@ -28,7 +29,10 @@ namespace tetryds.RealtimeMessaging.Network
 
         public bool Connected => client?.Connected ?? false;
 
-        public SocketClientGateway(int port, string host) : this(port, host, new MemoryPool()) { }
+        public SocketClientGateway(int port, string host) : this(port, host, new MemoryPool())
+        {
+            ownsMemoryPool = true;
+        }
 
         public SocketClientGateway(int port, string host, MemoryPool memoryPool)
         {
@@ -90,15 +94,12 @@ namespace tetryds.RealtimeMessaging.Network
 
         private void AddMessage(ReadBuffer readBuffer)
         {
-            Task.Run(() =>
-            {
-                T message = new T();
-                message.RemoteId = Guid.Empty;
-                message.ReadFromBuffer(readBuffer);
-                receivedMessages.Enqueue(message);
-                messageReceivedEvent.Set();
-                readBuffer.Dispose();
-            });
+            T message = new T();
+            message.RemoteId = Guid.Empty;
+            message.ReadFromBuffer(readBuffer);
+            receivedMessages.Enqueue(message);
+            messageReceivedEvent.Set();
+            readBuffer.Dispose();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -119,7 +120,8 @@ namespace tetryds.RealtimeMessaging.Network
 
             running = false;
             client?.Dispose();
-            memoryPool.Dispose();
+            if (ownsMemoryPool)
+                memoryPool.Dispose();
         }
     }
 }
