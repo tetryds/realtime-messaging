@@ -22,18 +22,13 @@ namespace tetryds.RealtimeMessaging
         public Router(IGateway<Message> gateway)
         {
             this.gateway = gateway;
-
-            EchoConsumer echo = new EchoConsumer();
-            echo.Replied += m => DoRespond(m, true);
-
-            consumerMap = new Dictionary<char, IMessageConsumer>()
-            {
-                ['E'] = echo
-            };
+            consumerMap = new Dictionary<char, IMessageConsumer>();
         }
 
         public void Start()
         {
+            if (running) return;
+
             routerWorker = new Thread(DoRoute);
             routerWorker.IsBackground = true;
             routerWorker.Priority = ThreadPriority.BelowNormal;
@@ -46,9 +41,11 @@ namespace tetryds.RealtimeMessaging
 
         public bool HasConsumer(char key) => consumerMap.ContainsKey(key);
 
-        public bool TryRegisterConsumer(char key, IMessageConsumer consumer)
+        public bool TryRegisterConsumer(char key, IMessageConsumer consumer, bool signalError)
         {
             if (HasConsumer(key)) return false;
+
+            consumer.Replied += m => DoRespond(m, signalError);
 
             consumerMap.Add(key, consumer);
             return true;
@@ -60,16 +57,21 @@ namespace tetryds.RealtimeMessaging
             {
                 if (!gateway.TryGet(PollingSkipRateMs, out Message message)) continue;
 
-                if (!consumerMap.TryGetValue(message.Type, out IMessageConsumer consumer))
+                try
                 {
-                    ErrorOcurred?.Invoke(new Exception($"Unmapped message type '{message.Type}' cannot be consumed"));
-                }
+                    if (!consumerMap.TryGetValue(message.Type, out IMessageConsumer consumer))
+                        throw new Exception($"Unmapped message type '{message.Type}' cannot be consumed");
 
-                consumer.Consume(message);
+                    consumer.Consume(message);
+                }
+                catch (Exception e)
+                {
+                    ErrorOcurred?.Invoke(e);
+                }
             }
         }
 
-        private void DoRespond(Message message, bool raiseError)
+        private void DoRespond(Message message, bool signalError)
         {
             try
             {
@@ -77,7 +79,7 @@ namespace tetryds.RealtimeMessaging
             }
             catch (Exception e)
             {
-                if (raiseError)
+                if (signalError)
                     ErrorOcurred?.Invoke(e);
             }
         }
