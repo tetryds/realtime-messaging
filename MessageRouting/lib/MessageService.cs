@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
+using tetryds.RealtimeMessaging.Consumers;
 
 namespace tetryds.RealtimeMessaging
 {
@@ -12,6 +13,8 @@ namespace tetryds.RealtimeMessaging
         volatile bool running = false;
 
         public event Action<Exception> ErrorOcurred;
+
+        public bool Running => running;
 
         public MessageService(IGateway<Message> gateway, bool defaultConsumers)
         {
@@ -42,9 +45,9 @@ namespace tetryds.RealtimeMessaging
             EchoConsumer echo = new EchoConsumer();
             router.TryRegisterConsumer('E', echo, true);
 
-            ErrorConsumer error = new ErrorConsumer();
+            ExceptionNotifierConsumer error = new ExceptionNotifierConsumer();
             router.ErrorOcurred += error.NotifyError;
-            router.TryRegisterConsumer('R', error, true);
+            router.TryRegisterConsumer('R', error, false);
 
             ThrowingConsumer throwing = new ThrowingConsumer();
             router.TryRegisterConsumer('W', throwing, true);

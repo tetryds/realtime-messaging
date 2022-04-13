@@ -2,7 +2,7 @@
 using System.Text;
 using tetryds.RealtimeMessaging.MemoryManagement;
 
-namespace tetryds.RealtimeMessaging
+namespace tetryds.RealtimeMessaging.Consumers
 {
     public class ThrowingConsumer : IMessageConsumer
     {

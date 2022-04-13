@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 namespace tetryds.RealtimeMessaging
 {
     [Serializable]
-    internal class BadMessageException : Exception
+    public class BadMessageException : Exception
     {
         public Type Type { get; }
 

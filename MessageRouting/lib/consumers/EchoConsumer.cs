@@ -1,7 +1,7 @@
 ﻿using System;
 using tetryds.RealtimeMessaging.MemoryManagement;
 
-namespace tetryds.RealtimeMessaging
+namespace tetryds.RealtimeMessaging.Consumers
 {
     public class EchoConsumer : IMessageConsumer
     {

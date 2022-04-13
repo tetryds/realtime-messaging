@@ -5,9 +5,9 @@ using System.Text;
 using tetryds.RealtimeMessaging.MemoryManagement;
 using tetryds.RealtimeMessaging.Network.Exceptions;
 
-namespace tetryds.RealtimeMessaging
+namespace tetryds.RealtimeMessaging.Consumers
 {
-    public class ErrorConsumer : IMessageConsumer
+    public class ExceptionNotifierConsumer : IMessageConsumer
     {
         public event Action<Message> Replied;
 
@@ -19,6 +19,7 @@ namespace tetryds.RealtimeMessaging
             {
                 if (exception is RemoteNotConnectedException remoteNotConnected)
                     errorConsumers.Remove(remoteNotConnected.ClientId);
+
                 //Send message with error metadata
                 foreach (Guid guid in errorConsumers)
                 {
@@ -29,28 +30,25 @@ namespace tetryds.RealtimeMessaging
 
         public void Consume(Message message)
         {
-            if (message.Data.Length != 1)
-                throw new BadMessageException(typeof(ErrorConsumer), $"Wrong message payload length: '{message.Data.Length}'. Expected length: '1'");
+            if (message.Data.Length != sizeof(bool))
+                throw new BadMessageException(typeof(ExceptionNotifierConsumer), $"Wrong message payload length: '{message.Data.Length}'. Expected length: '1'");
             bool register = BitConverter.ToBoolean(message.Data, 0);
-            if (register)
-                Register(message.RemoteId);
-            else
-                Unregister(message.RemoteId);
+            bool success = register ? Register(message.RemoteId) : Unregister(message.RemoteId);
         }
 
-        private void Register(Guid guid)
+        private bool Register(Guid guid)
         {
             lock (errorConsumers)
             {
-                errorConsumers.Add(guid);
+                return errorConsumers.Add(guid);
             }
         }
 
-        private void Unregister(Guid clientId)
+        private bool Unregister(Guid clientId)
         {
             lock (errorConsumers)
             {
-                errorConsumers.Remove(clientId);
+                return errorConsumers.Remove(clientId);
             }
         }
 
@@ -58,6 +56,7 @@ namespace tetryds.RealtimeMessaging
         {
             Message message = new Message();
             message.RemoteId = cliendId;
+            message.Status = Status.Continue;
             message.Data = Encoding.UTF8.GetBytes(e.ToString());
             return message;
         }
