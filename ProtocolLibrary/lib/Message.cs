@@ -9,6 +9,7 @@ namespace tetryds.RealtimeMessaging
 
         public Guid RemoteId { get; set; }
 
+        public Guid MessageId;
         public char Type;
         public Status Status;
         public byte[] Data;
@@ -16,7 +17,7 @@ namespace tetryds.RealtimeMessaging
         public void ReadFromBuffer(ReadBuffer reader)
         {
             if (reader.Length < HEADER_SIZE)
-                throw new BadMessageException(typeof(Message), "Wrong message length");
+                throw new Exception($"{typeof(Message)}; Wrong message length");
 
             byte[] header = new byte[HEADER_SIZE];
             reader.Read(header);
@@ -32,6 +33,27 @@ namespace tetryds.RealtimeMessaging
             writer.Write(BitConverter.GetBytes(Type));
             writer.Write(BitConverter.GetBytes((ushort)Status));
             writer.Write(Data);
+        }
+
+        public Message CloneHeader()
+        {
+            Message message = new Message
+            {
+                RemoteId = RemoteId,
+                MessageId = MessageId,
+                Type = Type,
+                Status = Status
+            };
+            return message;
+        }
+
+        public Message DeepClone()
+        {
+            Message clone = CloneHeader();
+            byte[] data = new byte[Data.Length];
+            Array.Copy(Data, data, Data.Length);
+            clone.Data = data;
+            return clone;
         }
     }
 }
